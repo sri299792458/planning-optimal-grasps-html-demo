@@ -1,0 +1,2545 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Planning Optimal Grasps</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="vendor/katex/katex.min.css">
+  <style>
+    :root {
+      --paper: #f5efe4;
+      --paper-2: #ede2cf;
+      --card: rgba(255, 251, 244, 0.94);
+      --ink: #1d1a17;
+      --muted: #5c554d;
+      --line: #d8ccb8;
+      --green: #0e7257;
+      --rust: #b85a2b;
+      --good: #176c42;
+      --bad: #a5372b;
+      --shadow: 0 16px 40px rgba(72, 54, 27, 0.10);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0) 28%),
+        linear-gradient(180deg, var(--paper) 0%, var(--paper-2) 100%);
+      font-family: "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(93, 73, 41, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(93, 73, 41, 0.04) 1px, transparent 1px);
+      background-size: 32px 32px;
+      mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0));
+    }
+
+    a {
+      color: inherit;
+    }
+
+    code {
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 0.92rem;
+    }
+
+    .katex {
+      font-size: 1.02em;
+    }
+
+    .formula-line .katex-display {
+      margin: 0;
+    }
+
+    .notation-table .katex,
+    .wrench-table .katex,
+    .tag .katex,
+    h2 .katex,
+    h3 .katex,
+    p .katex,
+    li .katex {
+      font-size: 1em;
+    }
+
+    h1,
+    h2,
+    h3 {
+      margin: 0 0 10px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+
+    p {
+      margin: 0 0 14px;
+      line-height: 1.58;
+    }
+
+    ul,
+    ol {
+      margin: 0;
+      padding-left: 20px;
+      color: var(--muted);
+    }
+
+    li + li {
+      margin-top: 8px;
+    }
+
+    .hero,
+    .page {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding-left: 20px;
+      padding-right: 20px;
+    }
+
+    .hero {
+      padding-top: 28px;
+      padding-bottom: 18px;
+    }
+
+    .hero-card,
+    .section,
+    .lab,
+    .summary-card,
+    .aside-card,
+    .control-panel,
+    .figure-panel {
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: var(--card);
+      box-shadow: var(--shadow);
+    }
+
+    .hero-card {
+      padding: 28px 28px 24px;
+      background:
+        linear-gradient(135deg, rgba(14, 114, 87, 0.11), rgba(184, 90, 43, 0.08)),
+        var(--card);
+      border-radius: 30px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: rgba(29, 26, 23, 0.07);
+      color: var(--muted);
+      font-size: 0.88rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .hero h1 {
+      font-size: clamp(2.5rem, 5vw, 4.3rem);
+      line-height: 1.02;
+      max-width: 900px;
+    }
+
+    .lead {
+      max-width: 980px;
+      font-size: 1.08rem;
+      color: var(--muted);
+    }
+
+    .jump-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .jump-row a {
+      text-decoration: none;
+      border: 1px solid #cdbca1;
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: rgba(255, 251, 244, 0.88);
+      font-size: 0.94rem;
+    }
+
+    .summary-grid,
+    .grid-2,
+    .grid-3,
+    .criteria-grid,
+    .algo-grid,
+    .mini-grid,
+    .projection-grid,
+    .spatial-grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .summary-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      margin-top: 18px;
+    }
+
+    .grid-2,
+    .criteria-grid,
+    .algo-grid,
+    .mini-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .grid-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .projection-grid {
+      grid-template-columns: repeat(2, minmax(280px, 1fr));
+    }
+
+    .spatial-grid {
+      grid-template-columns: minmax(0, 1.28fr) minmax(300px, 0.72fr);
+      align-items: start;
+    }
+
+    .summary-card,
+    .aside-card,
+    .criteria-card,
+    .algo-card,
+    .control-panel,
+    .figure-panel {
+      padding: 18px;
+    }
+
+    .summary-card p,
+    .aside-card p,
+    .aside-card li,
+    .criteria-card p,
+    .algo-card p,
+    .algo-card li,
+    .lab-lead,
+    .figure-caption,
+    .footer-note {
+      color: var(--muted);
+    }
+
+    .page {
+      padding-top: 0;
+      padding-bottom: 40px;
+    }
+
+    .paper {
+      display: grid;
+      gap: 18px;
+    }
+
+    .section,
+    .lab {
+      padding: 22px;
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: start;
+      margin-bottom: 12px;
+    }
+
+    .section-head p {
+      max-width: 760px;
+      color: var(--muted);
+    }
+
+    .tag {
+      min-width: 220px;
+      padding: 12px 14px;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: #f7efe0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .tag strong,
+    .status-box strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--ink);
+    }
+
+    .formula-box,
+    .status-box,
+    .note-box {
+      margin-top: 12px;
+      padding: 14px;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: #f8f2e8;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .formula-line + .formula-line {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px dashed #d7cbb7;
+    }
+
+    .notation-table,
+    .wrench-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 0.93rem;
+    }
+
+    .notation-table th,
+    .notation-table td,
+    .wrench-table th,
+    .wrench-table td {
+      padding: 8px 6px;
+      text-align: left;
+      vertical-align: top;
+      border-bottom: 1px solid rgba(216, 204, 184, 0.86);
+    }
+
+    .notation-table th,
+    .wrench-table th {
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .criteria-card,
+    .algo-card {
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: linear-gradient(180deg, rgba(255, 253, 249, 0.98), rgba(247, 239, 224, 0.92));
+    }
+
+    .lab-layout {
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr);
+      gap: 18px;
+      margin-top: 18px;
+      align-items: start;
+    }
+
+    .controls {
+      position: sticky;
+      top: 16px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .control-group + .control-group {
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+    }
+
+    .field {
+      margin-bottom: 12px;
+    }
+
+    .field label {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 0.95rem;
+    }
+
+    .value {
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--green);
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    button {
+      border: 1px solid #cdbca1;
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: #fffaf1;
+      color: var(--ink);
+      cursor: pointer;
+      font: inherit;
+    }
+
+    button.active {
+      background: var(--green);
+      border-color: var(--green);
+      color: #fff;
+    }
+
+    .status-box.good {
+      border-color: rgba(23, 108, 66, 0.25);
+      background: rgba(233, 246, 238, 0.96);
+      color: var(--good);
+    }
+
+    .status-box.bad {
+      border-color: rgba(165, 55, 43, 0.28);
+      background: rgba(251, 238, 235, 0.96);
+      color: var(--bad);
+    }
+
+    .figure-grid {
+      display: grid;
+      gap: 18px;
+    }
+
+    .viz-top {
+      display: grid;
+      grid-template-columns: 1.08fr 0.92fr;
+      gap: 18px;
+    }
+
+    .figure-svg {
+      width: 100%;
+      height: auto;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .three-view {
+      position: relative;
+      width: 100%;
+      min-height: 360px;
+      aspect-ratio: 640 / 460;
+      overflow: hidden;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background:
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.35) 38%, rgba(255, 255, 255, 0.08) 100%),
+        linear-gradient(180deg, #fffdfa 0%, #f7efe2 100%);
+    }
+
+    .three-view canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .panel-head h3 {
+      margin-bottom: 0;
+    }
+
+    .viewer-actions {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .viewer-actions button {
+      min-width: 40px;
+      text-align: center;
+    }
+
+    .zoom-pill {
+      padding: 7px 11px;
+      border: 1px solid #d5c5ab;
+      border-radius: 999px;
+      background: #f8f2e8;
+      color: var(--muted);
+      font-size: 0.88rem;
+      white-space: nowrap;
+    }
+
+    .figure-caption {
+      margin-top: 10px;
+      margin-bottom: 12px;
+    }
+
+    .selection-readout {
+      margin-top: 12px;
+    }
+
+    .selection-readout strong {
+      color: var(--ink);
+    }
+
+    .selection-grid {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+      margin-bottom: 10px;
+    }
+
+    .selection-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px dashed #d7cbb7;
+    }
+
+    .selection-row:last-child {
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+
+    .selection-value {
+      color: var(--ink);
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.92rem;
+    }
+
+    #wrench-space-3d {
+      cursor: grab;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    #wrench-space-3d.dragging {
+      cursor: grabbing;
+    }
+
+    #wrench-space-3d:focus-visible {
+      outline: 2px solid rgba(76, 103, 143, 0.45);
+      outline-offset: 4px;
+    }
+
+    .css2d-root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .scene-tag {
+      color: var(--muted);
+      font-size: 0.88rem;
+      white-space: nowrap;
+      transform: translate(-50%, -50%);
+    }
+
+    .scene-tag.axis {
+      font-weight: 600;
+      color: #5c554d;
+    }
+
+    .scene-tag.set {
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+
+    .scene-tag.set.green {
+      color: #0e7257;
+    }
+
+    .scene-tag.set.rust {
+      color: #b85a2b;
+    }
+
+    .point-card-anchor {
+      transform: translate(-50%, -50%);
+    }
+
+    .point-card {
+      min-width: 138px;
+      margin-left: 18px;
+      margin-top: -72px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(216, 204, 184, 0.96);
+      background: rgba(255, 250, 244, 0.96);
+      box-shadow: 0 10px 24px rgba(72, 54, 27, 0.12);
+      color: var(--ink);
+      pointer-events: none;
+    }
+
+    .point-card-title {
+      font-size: 0.86rem;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .point-card-values {
+      margin-top: 4px;
+      color: var(--muted);
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.8rem;
+      line-height: 1.4;
+    }
+
+    .swatch {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+
+    @media (max-width: 1080px) {
+      .summary-grid,
+      .grid-2,
+      .grid-3,
+      .criteria-grid,
+      .algo-grid,
+      .lab-layout,
+      .spatial-grid,
+      .mini-grid,
+      .projection-grid,
+      .viz-top {
+        grid-template-columns: 1fr;
+      }
+
+      .controls {
+        position: static;
+      }
+
+      .section-head {
+        display: block;
+      }
+
+      .tag {
+        margin-top: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-card">
+      <div class="eyebrow">Paper replacement</div>
+      <h1>Planning Optimal Grasps</h1>
+      <p class="lead">
+        This page is a from-scratch rewrite of Ferrari and Canny's 1992 paper. It keeps the real ideas and
+        notation, but explains them in the order a human would want to learn them: what problem the paper
+        solves, how it models contact, what the wrench-set geometry means, why there are two criteria, and how
+        the planning algorithm actually uses the quality number.
+      </p>
+
+      <nav class="jump-row">
+        <a href="#problem">Problem</a>
+        <a href="#model">Model</a>
+        <a href="#quality">Quality</a>
+        <a href="#criteria">Criteria</a>
+        <a href="#algorithm">Algorithm</a>
+        <a href="#lab">Interactive Lab</a>
+      </nav>
+
+      <div class="summary-grid">
+        <article class="summary-card">
+          <h2>Core Idea</h2>
+          <p>
+            Turn a grasp into a set of feasible wrenches under a unit force budget, then score the grasp by the
+            radius of the largest origin-centered ball contained in that set.
+          </p>
+        </article>
+        <article class="summary-card">
+          <h2>Why The Math Looks Weird</h2>
+          <p>
+            The paper compresses contact mechanics, force budgeting, and convex geometry into the same notation.
+            Once those are separated, the symbols mostly become bookkeeping.
+          </p>
+        </article>
+        <article class="summary-card">
+          <h2>What To Remember</h2>
+          <p>
+            Primitive contact rays become primitive wrenches; primitive wrenches generate a feasible wrench set;
+            the nearest face of that set determines quality.
+          </p>
+        </article>
+      </div>
+    </div>
+  </header>
+
+  <main class="page">
+    <article class="paper">
+      <section id="problem" class="section">
+        <div class="section-head">
+          <div>
+            <h2>1. What Problem The Paper Solves</h2>
+            <p>
+              The paper is about grasp planning, not just grasp execution. Suppose a robot can place its fingers
+              on an object in several ways. Which grasp should it choose before execution? Ferrari and Canny
+              want one number that ranks candidate grasps by how robustly they can resist unknown disturbances.
+            </p>
+          </div>
+          <div class="tag">
+            <strong>One sentence version</strong>
+            Good grasps leave a bigger cushion around the zero-disturbance point.
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <article class="aside-card">
+            <h3>Force Closure Comes First</h3>
+            <p>
+              The paper starts from grasps that already satisfy force closure. The fingers should be able to
+              balance any external wrench without changing where the contacts are.
+            </p>
+            <div class="formula-box">
+              <div class="formula-line">
+                Force closure is the yes-or-no question.
+              </div>
+              <div class="formula-line">
+                Ferrari-Canny quality is the "how much margin do I have?" question.
+              </div>
+            </div>
+          </article>
+
+          <article class="aside-card">
+            <h3>What The Quality Number Means</h3>
+            <p>
+              The score is not about one favorable disturbance direction. It is the worst case over all
+              directions, because a planner does not get to choose what disturbance the world applies later.
+            </p>
+            <div class="formula-box">
+              <div class="formula-line">
+                Larger quality means a larger full ball of disturbances can be resisted.
+              </div>
+              <div class="formula-line">
+                Zero quality means some disturbance direction touches the boundary immediately.
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="model" class="section">
+        <div class="section-head">
+          <div>
+            <h2>2. Contact Model, Wrenches, And Scaling</h2>
+            <p>
+              The paper uses the hard-finger contact model. Each finger can apply a force inside its friction
+              cone. More complicated contacts such as edges or faces are represented using equivalent point
+              contacts. For planar objects the resulting wrench space is three-dimensional, which is why this
+              rewrite focuses on the planar case.
+            </p>
+          </div>
+          <div class="tag">
+            <strong>Planar wrench space</strong>
+            Two force components plus one out-of-plane torque.
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <article class="aside-card">
+            <h3>The Wrench Vector</h3>
+            <p>
+              A wrench packages force and torque into one vector. In 3D that vector has six components. In the
+              planar case it shrinks to three: \(F_x\), \(F_y\), and the scalar torque \(\tau\).
+            </p>
+            <div class="formula-box">
+              <div class="formula-line">\[ w = [F; T] \]</div>
+              <div class="formula-line">\[ w = [F_x, F_y, \tau] \] for planar objects</div>
+            </div>
+          </article>
+
+          <article class="aside-card">
+            <h3>Why <code>&lambda;</code> Exists</h3>
+            <p>
+              Force and torque have different physical units, so the paper introduces a scaling parameter
+              <code>&lambda;</code> inside the wrench norm. That parameter decides how much one unit of torque
+              should count relative to one unit of force.
+            </p>
+            <div class="formula-box">
+              <div class="formula-line">\[ \|w\| = \sqrt{F_x^2 + F_y^2 + \lambda \tau^2} \]</div>
+              <div class="formula-line">
+                In the interactive figure below we scale the torque axis directly as <code>s &tau;</code>, so
+                <code>&lambda; = s^2</code>.
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <article class="aside-card" style="margin-top:16px;">
+          <h3>Notation Cheat Sheet</h3>
+          <table class="notation-table">
+            <thead>
+              <tr>
+                <th>Paper notation</th>
+                <th>Meaning</th>
+                <th>Fast reading</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>\(f_i\)</td>
+                <td>Force applied at contact \(i\)</td>
+                <td>The thing the finger directly pushes with.</td>
+              </tr>
+              <tr>
+                <td>\(r_i\)</td>
+                <td>Vector from object center to contact \(i\)</td>
+                <td>Where the contact is located.</td>
+              </tr>
+              <tr>
+                <td>\(w_i\)</td>
+                <td>Primitive wrench induced by one primitive contact force</td>
+                <td>A point in wrench space.</td>
+              </tr>
+              <tr>
+                <td>\(w A g\)</td>
+                <td>Budget \(g\) can resist wrench \(w\)</td>
+                <td>Feasibility relation.</td>
+              </tr>
+              <tr>
+                <td>\(B_G\)</td>
+                <td>All unit-budget feasible wrenches</td>
+                <td>The main geometric object.</td>
+              </tr>
+              <tr>
+                <td>\(LQ_w\)</td>
+                <td>Local quality in one direction</td>
+                <td>How far you can go along that direction.</td>
+              </tr>
+              <tr>
+                <td>\(Q\)</td>
+                <td>Global grasp quality</td>
+                <td>The worst directional case.</td>
+              </tr>
+            </tbody>
+          </table>
+        </article>
+      </section>
+
+      <section id="quality" class="section">
+        <div class="section-head">
+          <div>
+            <h2>3. How The Quality Definition Really Works</h2>
+            <p>
+              This is the notation-heavy part of the paper, but conceptually it is clean. First define what it
+              means for a generalized force budget to resist a wrench. Then restrict to unit budget. Then ask:
+              over all disturbance directions, what is the smallest reachable boundary distance?
+            </p>
+          </div>
+          <div class="tag">
+            <strong>Geometric punchline</strong>
+            Quality is a nearest-face distance.
+          </div>
+        </div>
+
+        <div class="grid-3">
+          <article class="aside-card">
+            <h3>Step A: Feasibility</h3>
+            <p>
+              The predicate \(w A g\) means the generalized contact-force vector \(g\) can produce or resist the
+              wrench \(w\). Think of this as feasibility before optimization.
+            </p>
+            <div class="formula-box">
+              <div class="formula-line">\[ A = \{ (w, g) \mid w A g \} \]</div>
+            </div>
+          </article>
+
+          <article class="aside-card">
+            <h3>Step B: Unit Budget</h3>
+            <p>
+              The paper then restricts attention to generalized forces of unit size. That restriction creates
+              the set \(B_G\), which contains every wrench reachable under that normalized budget.
+            </p>
+            <div class="formula-box">
+              <div class="formula-line">\[ B = \{ (w, g) \mid w A g \text{ and } \|g\| = 1 \} \]</div>
+              <div class="formula-line">\[ B_G = \bigcup_g B_g \]</div>
+            </div>
+          </article>
+
+          <article class="aside-card">
+            <h3>Step C: Worst Direction</h3>
+            <p>
+              For one direction, \(LQ_w\) tells you how much wrench magnitude you can obtain per unit force.
+              The global quality \(Q\) is the minimum over directions, because the planner does not control
+              the future disturbance direction.
+            </p>
+            <div class="formula-box">
+              <div class="formula-line">\[ Q = \min_{\mathrm{dir}(w)} LQ_w \]</div>
+              <div class="formula-line">\[ Q = \operatorname{distance}(0, \operatorname{Bd}(B_G)) \]</div>
+            </div>
+          </article>
+        </div>
+
+        <article class="aside-card" style="margin-top:16px;">
+          <h3>Why This Becomes A Ball Inside A Set</h3>
+          <p>
+            Once everything is phrased in terms of \(B_G\), the paper's famous geometric picture drops out
+            immediately. The quality measure is the radius of the largest ball centered at the origin that fits
+            inside the feasible wrench set.
+          </p>
+          <div class="formula-box">
+            <div class="formula-line">
+              Positive radius means a positive worst-case disturbance margin.
+            </div>
+            <div class="formula-line">
+              Zero radius means a supporting face of the feasible set passes through the origin.
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section id="criteria" class="section">
+        <h2>4. Why There Are Two Criteria</h2>
+        <p>
+          The paper gives two formulas because there are two physically meaningful notions of "unit finger
+          effort." One cares about the worst single contact load. The other cares about total load summed across
+          contacts. Changing the norm changes the geometry of the feasible wrench set.
+        </p>
+
+        <div class="criteria-grid">
+          <article class="criteria-card">
+            <h3>The \(L_\infty\) Criterion</h3>
+            <p>
+              Each contact gets its own independent cap. Every contact can spend up to its own local unit
+              effort, so the global feasible set is obtained by combining the local contact sets through a
+              Minkowski sum.
+            </p>
+            <div class="formula-box">
+              <div class="formula-line">\[ W_G = W_1 \oplus W_2 \oplus \cdots \oplus W_n \]</div>
+              <div class="formula-line">
+                This is the paper's model for minimizing the maximum finger force.
+              </div>
+            </div>
+          </article>
+
+          <article class="criteria-card">
+            <h3>The \(L_1\) Criterion</h3>
+            <p>
+              All contacts share one total cap. Primitive contact rays therefore compete for the same total
+              budget, so the feasible set becomes the convex hull generated by the primitive wrenches and the
+              origin.
+            </p>
+            <div class="formula-box">
+              <div class="formula-line">\[ W_G = \operatorname{conv}(0, \text{primitive wrenches}) \]</div>
+              <div class="formula-line">
+                This is the paper's model for minimizing total finger effort.
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <div class="grid-2" style="margin-top:16px;">
+          <article class="aside-card">
+            <h3>What Minkowski Sum Means In This Paper</h3>
+            <p>
+              In Ferrari and Canny, \(W_i\) means the wrench set available from one contact under a local unit
+              budget. In the planar two-edge approximation used here, that local set is the triangle generated by
+              the origin and the two primitive wrench rays at that contact.
+            </p>
+            <div class="formula-box">
+              <div class="formula-line">\[ W_i = \operatorname{conv}\{0, w_{i,+}, w_{i,-}\} \]</div>
+              <div class="formula-line">\[ B_G = W_1 \oplus W_2 = \{x_1 + x_2 \mid x_1 \in W_1,\ x_2 \in W_2\} \]</div>
+            </div>
+            <p>
+              Read that literally: pick one feasible wrench from contact 1, pick one feasible wrench from
+              contact 2, then add them. Under \(L_\infty\), each contact keeps its own cap, so both contacts are
+              allowed to contribute fully at the same time.
+            </p>
+            <p>
+              That is why Minkowski-sum geometry is usually larger. It is the set of all pairwise sums, not a set
+              of averages. In paper language, this criterion asks the planner to minimize the maximum individual
+              finger load.
+            </p>
+          </article>
+
+          <article class="aside-card">
+            <h3>What Convex Hull Means In This Paper</h3>
+            <p>
+              Under \(L_1\), the contacts no longer have independent local budgets. All primitive contact rays
+              compete for one shared total effort budget, so the feasible wrench is built by distributing
+              nonnegative weights across primitive wrenches.
+            </p>
+            <div class="formula-box">
+              <div class="formula-line">\[ B_G = \operatorname{conv}\{0, w_{1,+}, w_{1,-}, w_{2,+}, w_{2,-}\} \]</div>
+              <div class="formula-line">\[ B_G = \left\{\sum_j \alpha_j w_j \;\middle|\; \alpha_j \ge 0,\ \sum_j \alpha_j \le 1 \right\} \]</div>
+            </div>
+            <p>
+              Read that literally: you are mixing primitive wrench directions under one shared budget. If one
+              contact spends more of the total effort, the others must spend less.
+            </p>
+            <p>
+              That is why convex-hull geometry is usually smaller than the Minkowski-sum set. It reflects shared
+              effort, not independent simultaneous spending. In paper language, this criterion asks the planner
+              to minimize total finger effort.
+            </p>
+          </article>
+        </div>
+
+        <article class="aside-card" style="margin-top:16px;">
+          <h3>A Worked Example From This Paper's Planar Pinch</h3>
+          <p>
+            Take the symmetric pinch used throughout the demo: contact 1 at the left side, contact 2 at the right
+            side, friction coefficient \(\mu = 1\), and torque scaling \(s = 1\). In that case the four primitive
+            wrenches are
+          </p>
+          <div class="formula-box">
+            <div class="formula-line">\[ w_{1,+} = [1, 1, -1],\qquad w_{1,-} = [1, -1, 1] \]</div>
+            <div class="formula-line">\[ w_{2,+} = [-1, -1, -1],\qquad w_{2,-} = [-1, 1, 1] \]</div>
+          </div>
+          <p>
+            Now compare the same direction under the two criteria. Under \(L_\infty\), each contact may spend its
+            full local budget, so one legal total wrench is
+          </p>
+          <div class="formula-box">
+            <div class="formula-line">\[ w_{1,+} + w_{2,-} = [1, 1, -1] + [-1, 1, 1] = [0, 2, 0] \]</div>
+            <div class="formula-line">\[ [0, 2, 0] \in W_1 \oplus W_2 \]</div>
+          </div>
+          <p>
+            This is the key Minkowski-sum move: choose one feasible point from \(W_1\), choose one feasible point
+            from \(W_2\), and add them. Both contacts contribute fully, so the total wrench can reach farther.
+          </p>
+          <p>
+            Under \(L_1\), that same point is not available, because the primitive rays must share one unit of
+            total effort. The best you can do in the same direction is a convex combination such as
+          </p>
+          <div class="formula-box">
+            <div class="formula-line">\[ \tfrac{1}{2} w_{1,+} + \tfrac{1}{2} w_{2,-} = [0, 1, 0] \]</div>
+            <div class="formula-line">\[ [0, 2, 0] \notin \operatorname{conv}\{0, w_{1,+}, w_{1,-}, w_{2,+}, w_{2,-}\} \]</div>
+          </div>
+          <p>
+            Why not? Because reaching \([0,2,0]\) would require coefficient \(1\) on \(w_{1,+}\) and coefficient
+            \(1\) on \(w_{2,-}\), so the total coefficient sum would be \(2\), which violates the shared-budget
+            rule. This is exactly why the \(L_\infty\) feasible set is larger than the \(L_1\) feasible set even
+            when both start from the same primitive wrench rays.
+          </p>
+        </article>
+
+        <article class="aside-card" style="margin-top:16px;">
+          <h3>Important Consequence</h3>
+          <p>
+            The two criteria are not equivalent. A grasp that is optimal under one can be non-optimal under the
+            other. So whenever the paper switches norms, it is not just changing notation. It is changing the
+            actual search landscape seen by the planner.
+          </p>
+        </article>
+      </section>
+
+      <section id="algorithm" class="section">
+        <h2>5. What The Planning Algorithm Actually Does</h2>
+        <p>
+          Once you accept the wrench-space viewpoint, the algorithm is straightforward: for each candidate grasp
+          geometry, compute primitive contacts, map them to primitive wrenches, build the appropriate feasible
+          set, compute its convex hull, and score the grasp by the distance from the origin to the nearest hull
+          face.
+        </p>
+
+        <div class="algo-grid">
+          <article class="algo-card">
+            <h3>Two-Jaw Polygonal Gripper</h3>
+            <ol>
+              <li>Enumerate candidate base and opponent contacts on the polygon.</li>
+              <li>Turn each contact type into primitive contacts and primitive wrenches.</li>
+              <li>Build the wrench set implied by the chosen criterion.</li>
+              <li>Compute the convex hull in wrench space.</li>
+              <li>Measure the minimum face distance from the origin.</li>
+            </ol>
+            <div class="formula-box">
+              <div class="formula-line">
+                Under the paper's assumptions, this becomes a finite search with linear-time behavior in the
+                number of polygon edges for the two-jaw case.
+              </div>
+            </div>
+          </article>
+
+          <article class="algo-card">
+            <h3>Three-Jaw Polygonal Gripper</h3>
+            <ol>
+              <li>Pick a base side and determine the two opponent contacts induced by the finger triangle.</li>
+              <li>Reject collision or impossible closure configurations.</li>
+              <li>Compute primitive contacts and primitive wrenches for the surviving grasp.</li>
+              <li>Evaluate quality the same way: build the hull and read off the nearest face.</li>
+            </ol>
+            <div class="formula-box">
+              <div class="formula-line">
+                The geometry is more complex, but the scoring principle is identical.
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <article class="aside-card" style="margin-top:16px;">
+          <h3>What The Paper Leaves Open</h3>
+          <p>
+            The conclusion points out two open modeling choices: some geometric assumptions are what make the
+            search finite, and force and torque are not naturally comparable, so the wrench norm scaling remains
+            a modeling decision.
+          </p>
+        </article>
+      </section>
+
+      <section id="lab" class="lab">
+        <h2>6. Interactive Lab</h2>
+        <p class="lab-lead">
+          This is the paper's main figure rebuilt as a live 3D wrench-space figure. Read the sections above once,
+          then drag the main plot below to connect the notation to the geometry. The controls change the grasp,
+          the local contact sets, the global feasible wrench set, and the Ferrari-Canny quality margin all at once.
+        </p>
+
+        <div class="lab-layout">
+          <aside class="controls">
+            <section class="control-panel">
+              <h3>Controls</h3>
+
+              <div class="control-group">
+                <h3>Force Budget</h3>
+                <p class="value">
+                  \(L_\infty\) gives each contact its own local cap. \(L_1\) gives the grasp one shared total
+                  cap.
+                </p>
+                <div class="button-row">
+                  <button id="metric-linf" class="active">Use \(L_\infty\)</button>
+                  <button id="metric-l1">Use \(L_1\)</button>
+                </div>
+              </div>
+
+              <div class="control-group">
+                <h3>Geometry</h3>
+                <div class="field">
+                  <label for="radius">Object radius: <span class="value" id="radius-value"></span></label>
+                  <input id="radius" type="range" min="0.6" max="2.0" step="0.05" value="1">
+                </div>
+                <div class="field">
+                  <label for="mu">Friction coefficient \(\mu\): <span class="value" id="mu-value"></span></label>
+                  <input id="mu" type="range" min="0" max="2.0" step="0.05" value="1">
+                </div>
+                <div class="field">
+                  <label for="theta1">Contact 1 angle: <span class="value" id="theta1-value"></span></label>
+                  <input id="theta1" type="range" min="0" max="360" step="1" value="180">
+                </div>
+                <div class="field">
+                  <label for="theta2">Contact 2 angle: <span class="value" id="theta2-value"></span></label>
+                  <input id="theta2" type="range" min="0" max="360" step="1" value="0">
+                </div>
+                <div class="field">
+                  <label for="torqueScale">Torque scale \(s\): <span class="value" id="torqueScale-value"></span></label>
+                  <input id="torqueScale" type="range" min="0.25" max="2.0" step="0.05" value="1">
+                </div>
+                <div class="button-row">
+                  <button id="preset-symmetric" class="active">Symmetric pinch</button>
+                  <button id="preset-lowmu">Low friction</button>
+                  <button id="preset-skewed">Skewed</button>
+                  <button id="preset-fail">Failure case</button>
+                </div>
+              </div>
+            </section>
+
+            <section class="control-panel">
+              <div id="status-box" class="status-box"></div>
+              <div id="live-summary" class="note-box"></div>
+              <table class="wrench-table">
+                <thead>
+                  <tr>
+                    <th>Primitive</th>
+                    <th>\([F_x, F_y, s\tau]\)</th>
+                  </tr>
+                </thead>
+                <tbody id="wrench-table-body"></tbody>
+              </table>
+            </section>
+          </aside>
+
+          <section class="figure-grid">
+            <div class="viz-top">
+              <section class="figure-panel">
+                <h3>Contact Geometry</h3>
+                <svg id="scene" class="figure-svg" viewBox="0 0 420 420" aria-label="Contact geometry"></svg>
+                <div class="legend">
+                  <span><span class="swatch" style="background:#0e7257"></span>Contact 1 cone edges</span>
+                  <span><span class="swatch" style="background:#b85a2b"></span>Contact 2 cone edges</span>
+                  <span><span class="swatch" style="background:#1d1a17"></span>Dashed arrows = inward normals</span>
+                </div>
+              </section>
+
+              <section class="figure-panel">
+                <h3>Live Notation</h3>
+                <table class="notation-table">
+                  <thead>
+                    <tr>
+                      <th>Symbol</th>
+                      <th>Meaning</th>
+                      <th>Current value</th>
+                    </tr>
+                  </thead>
+                  <tbody id="notation-body"></tbody>
+                </table>
+                <div id="equation-box" class="formula-box"></div>
+              </section>
+            </div>
+
+            <div class="spatial-grid">
+              <section class="figure-panel">
+                <div class="panel-head">
+                  <h3>3D Wrench Space</h3>
+                  <div class="viewer-actions">
+                    <div id="zoom-value" class="zoom-pill">Zoom 100%</div>
+                    <button id="zoom-out" type="button" aria-label="Zoom out">-</button>
+                    <button id="reset-view" type="button">Reset view</button>
+                    <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+                  </div>
+                </div>
+                <p class="figure-caption">
+                  Drag the figure to rotate it. The green and rust triangles are the one-contact sets
+                  \(W_1\) and \(W_2\). The pale blue polyhedron is the global feasible wrench set \(B_G\). Click a
+                  point to inspect its exact coordinates, and scroll or use the zoom buttons to move in and out.
+                </p>
+                <div id="wrench-space-3d" class="three-view" aria-label="3D wrench space" tabindex="0"></div>
+                <div class="legend">
+                  <span><span class="swatch" style="background:#0e7257"></span>\(W_1\)</span>
+                  <span><span class="swatch" style="background:#b85a2b"></span>\(W_2\)</span>
+                  <span><span class="swatch" style="background:#6f8dc5"></span>\(B_G\)</span>
+                </div>
+              </section>
+
+              <section class="figure-panel">
+                <h3>Read The 3D View</h3>
+                <div id="wrench-space-note" class="note-box"></div>
+                <div id="metric-note" class="formula-box"></div>
+                <div id="critical-point-card" class="note-box selection-readout"></div>
+              </section>
+            </div>
+          </section>
+        </div>
+      </section>
+    </article>
+  </main>
+
+  <script src="vendor/katex/katex.min.js"></script>
+  <script src="vendor/katex/contrib/auto-render.min.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three/package/build/three.module.js"
+      }
+    }
+  </script>
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "./vendor/three/package/examples/jsm/controls/OrbitControls.js";
+    import { CSS2DObject, CSS2DRenderer } from "./vendor/three/package/examples/jsm/renderers/CSS2DRenderer.js";
+
+    const state = {
+      metric: "linf",
+      radius: 1,
+      mu: 1,
+      theta1: 180,
+      theta2: 0,
+      torqueScale: 1
+    };
+
+    const presets = {
+      symmetric: { radius: 1, mu: 1, theta1: 180, theta2: 0, torqueScale: 1, metric: "linf" },
+      lowmu: { radius: 1, mu: 0.2, theta1: 180, theta2: 0, torqueScale: 1, metric: "linf" },
+      skewed: { radius: 1, mu: 0.9, theta1: 165, theta2: 25, torqueScale: 1, metric: "linf" },
+      fail: { radius: 1, mu: 1, theta1: 150, theta2: 110, torqueScale: 1, metric: "linf" }
+    };
+
+    const inputIds = ["radius", "mu", "theta1", "theta2", "torqueScale"];
+    const presetIds = ["preset-symmetric", "preset-lowmu", "preset-skewed", "preset-fail"];
+    let selectedPointKey = null;
+    let lastSpatialData = null;
+    let wrenchView = null;
+
+    function degToRad(deg) {
+      return deg * Math.PI / 180;
+    }
+
+    function fmt(value, digits = 2) {
+      return Number(value).toFixed(digits);
+    }
+
+    function pointKey(point, digits = 6) {
+      return point.map(value => Number(value).toFixed(digits)).join("|");
+    }
+
+    function vecAdd(a, b) {
+      return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+    }
+
+    function vecSub(a, b) {
+      return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+    }
+
+    function vecScale(a, s) {
+      return [a[0] * s, a[1] * s, a[2] * s];
+    }
+
+    function dot(a, b) {
+      return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    }
+
+    function cross(a, b) {
+      return [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0]
+      ];
+    }
+
+    function norm(a) {
+      return Math.hypot(a[0], a[1], a[2]);
+    }
+
+    function normalize(a) {
+      const length = norm(a) || 1;
+      return [a[0] / length, a[1] / length, a[2] / length];
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function unique3D(points, digits = 8) {
+      const seen = new Map();
+      for (const point of points) {
+        const key = point.map(value => Number(value).toFixed(digits)).join("|");
+        if (!seen.has(key)) {
+          seen.set(key, point);
+        }
+      }
+      return Array.from(seen.values());
+    }
+
+    function contactFromAngle(thetaDeg, radius, mu, torqueScale) {
+      const theta = degToRad(thetaDeg);
+      const r = [radius * Math.cos(theta), radius * Math.sin(theta)];
+      const outward = [Math.cos(theta), Math.sin(theta)];
+      const inward = [-outward[0], -outward[1]];
+      const tangent = [-inward[1], inward[0]];
+
+      const forcePlus = [inward[0] + mu * tangent[0], inward[1] + mu * tangent[1]];
+      const forceMinus = [inward[0] - mu * tangent[0], inward[1] - mu * tangent[1]];
+
+      function wrenchFromForce(force) {
+        const tau = torqueScale * (r[0] * force[1] - r[1] * force[0]);
+        return [force[0], force[1], tau];
+      }
+
+      return {
+        r,
+        inward,
+        tangent,
+        forces: [forcePlus, forceMinus],
+        primitiveWrenches: [wrenchFromForce(forcePlus), wrenchFromForce(forceMinus)]
+      };
+    }
+
+    function buildFeasibleVertices(contact1, contact2, metric) {
+      const zero = [0, 0, 0];
+      if (metric === "l1") {
+        return unique3D([zero, ...contact1.primitiveWrenches, ...contact2.primitiveWrenches]);
+      }
+
+      const local1 = [zero, ...contact1.primitiveWrenches];
+      const local2 = [zero, ...contact2.primitiveWrenches];
+      const sums = [];
+      for (const p of local1) {
+        for (const q of local2) {
+          sums.push(vecAdd(p, q));
+        }
+      }
+      return unique3D(sums);
+    }
+
+    function computeSupportingFacets(points) {
+      const tol = 1e-8;
+      const facets = [];
+      const planeKeys = new Set();
+
+      for (let i = 0; i < points.length; i += 1) {
+        for (let j = i + 1; j < points.length; j += 1) {
+          for (let k = j + 1; k < points.length; k += 1) {
+            const a = points[i];
+            const b = points[j];
+            const c = points[k];
+            const ab = vecSub(b, a);
+            const ac = vecSub(c, a);
+            let n = cross(ab, ac);
+            if (norm(n) < tol) {
+              continue;
+            }
+
+            let allPos = true;
+            let allNeg = true;
+            for (const point of points) {
+              const side = dot(n, vecSub(point, a));
+              if (side > tol) {
+                allNeg = false;
+              }
+              if (side < -tol) {
+                allPos = false;
+              }
+            }
+
+            if (!allPos && !allNeg) {
+              continue;
+            }
+
+            if (allPos) {
+              n = vecScale(n, -1);
+            }
+
+            const unit = vecScale(n, 1 / norm(n));
+            const signedDistance = dot(unit, a);
+            const canonical = signedDistance < 0
+              ? [...vecScale(unit, -1), -signedDistance]
+              : [...unit, signedDistance];
+            const key = canonical.map(value => Number(value).toFixed(6)).join("|");
+            if (planeKeys.has(key)) {
+              continue;
+            }
+            planeKeys.add(key);
+
+            facets.push({
+              normal: unit,
+              distance: Math.abs(signedDistance)
+            });
+          }
+        }
+      }
+
+      return facets;
+    }
+
+    function computeHullFaces(points) {
+      const tol = 1e-8;
+      const faces = [];
+      const planeKeys = new Set();
+
+      for (let i = 0; i < points.length; i += 1) {
+        for (let j = i + 1; j < points.length; j += 1) {
+          for (let k = j + 1; k < points.length; k += 1) {
+            const a = points[i];
+            const b = points[j];
+            const c = points[k];
+            let n = cross(vecSub(b, a), vecSub(c, a));
+            if (norm(n) < tol) {
+              continue;
+            }
+
+            let allPos = true;
+            let allNeg = true;
+            for (const point of points) {
+              const side = dot(n, vecSub(point, a));
+              if (side > tol) {
+                allNeg = false;
+              }
+              if (side < -tol) {
+                allPos = false;
+              }
+            }
+
+            if (!allPos && !allNeg) {
+              continue;
+            }
+
+            if (allPos) {
+              n = vecScale(n, -1);
+            }
+
+            let normal = normalize(n);
+            let distance = dot(normal, a);
+            if (distance < 0) {
+              normal = vecScale(normal, -1);
+              distance = -distance;
+            }
+
+            const key = [...normal, distance].map(value => Number(value).toFixed(6)).join("|");
+            if (planeKeys.has(key)) {
+              continue;
+            }
+            planeKeys.add(key);
+
+            const faceIndices = [];
+            points.forEach((point, index) => {
+              const offset = dot(normal, point) - distance;
+              if (Math.abs(offset) <= 1e-6) {
+                faceIndices.push(index);
+              }
+            });
+
+            if (faceIndices.length < 3) {
+              continue;
+            }
+
+            let centroid = [0, 0, 0];
+            faceIndices.forEach(index => {
+              centroid = vecAdd(centroid, points[index]);
+            });
+            centroid = vecScale(centroid, 1 / faceIndices.length);
+
+            let basisU = vecSub(points[faceIndices[0]], centroid);
+            if (norm(basisU) < tol) {
+              basisU = Math.abs(normal[0]) < 0.8 ? cross(normal, [1, 0, 0]) : cross(normal, [0, 1, 0]);
+            }
+            basisU = normalize(basisU);
+            const basisV = normalize(cross(normal, basisU));
+
+            const ordered = faceIndices.slice().sort((indexA, indexB) => {
+              const aVec = vecSub(points[indexA], centroid);
+              const bVec = vecSub(points[indexB], centroid);
+              const angleA = Math.atan2(dot(aVec, basisV), dot(aVec, basisU));
+              const angleB = Math.atan2(dot(bVec, basisV), dot(bVec, basisU));
+              return angleA - angleB;
+            });
+
+            faces.push({ normal, distance, indices: ordered });
+          }
+        }
+      }
+
+      return faces;
+    }
+
+    function computeEpsilon(points) {
+      const facets = computeSupportingFacets(points);
+      if (facets.length === 0) {
+        return { epsilon: 0, limitingFacet: null };
+      }
+
+      let limitingFacet = facets[0];
+      for (const facet of facets) {
+        if (facet.distance < limitingFacet.distance) {
+          limitingFacet = facet;
+        }
+      }
+
+      return {
+        epsilon: limitingFacet.distance,
+        limitingFacet
+      };
+    }
+
+    function buildCriticalTouchPoint(epsilon, limitingFacet) {
+      if (!limitingFacet) {
+        return null;
+      }
+
+      return {
+        key: pointKey(vecScale(limitingFacet.normal, epsilon)),
+        point: vecScale(limitingFacet.normal, epsilon),
+        normal: limitingFacet.normal,
+        epsilon,
+        labelTex: "\\text{nearest boundary point}",
+        labelPlain: "nearest boundary point",
+        description: epsilon > 1e-6
+          ? "Nearest point on the boundary of the feasible wrench set from the origin."
+          : "The nearest boundary point has collapsed to the origin, so the quality is zero."
+      };
+    }
+
+    function buildSelectablePoints(contact1, contact2, vertices3D, criticalTouch = null) {
+      const selectables = [];
+      const seen = new Set();
+
+      function add(point, info) {
+        const key = pointKey(point);
+        if (seen.has(key)) {
+          return;
+        }
+        seen.add(key);
+        selectables.push({
+          key,
+          point,
+          ...info
+        });
+      }
+
+      add([0, 0, 0], {
+        labelTex: "0",
+        labelPlain: "origin",
+        description: "Zero-disturbance origin in wrench space.",
+        color: "#1d1a17",
+        kind: "origin"
+      });
+
+      if (criticalTouch && criticalTouch.epsilon > 1e-6) {
+        add(criticalTouch.point, {
+          labelTex: criticalTouch.labelTex,
+          labelPlain: criticalTouch.labelPlain,
+          description: criticalTouch.description,
+          color: "#c7921c",
+          kind: "critical"
+        });
+      }
+
+      add(contact1.primitiveWrenches[0], {
+        labelTex: "w_{1,+}",
+        labelPlain: "w1+",
+        description: "Primitive wrench ray from contact 1 along the + cone edge.",
+        color: "#0e7257",
+        kind: "primitive"
+      });
+      add(contact1.primitiveWrenches[1], {
+        labelTex: "w_{1,-}",
+        labelPlain: "w1-",
+        description: "Primitive wrench ray from contact 1 along the - cone edge.",
+        color: "#0e7257",
+        kind: "primitive"
+      });
+      add(contact2.primitiveWrenches[0], {
+        labelTex: "w_{2,+}",
+        labelPlain: "w2+",
+        description: "Primitive wrench ray from contact 2 along the + cone edge.",
+        color: "#b85a2b",
+        kind: "primitive"
+      });
+      add(contact2.primitiveWrenches[1], {
+        labelTex: "w_{2,-}",
+        labelPlain: "w2-",
+        description: "Primitive wrench ray from contact 2 along the - cone edge.",
+        color: "#b85a2b",
+        kind: "primitive"
+      });
+
+      let vertexCount = 1;
+      vertices3D.forEach(point => {
+        add(point, {
+          labelTex: `v_{${vertexCount}}`,
+          labelPlain: `v${vertexCount}`,
+          description: "Vertex of the current global feasible set.",
+          color: "#4c678f",
+          kind: "vertex"
+        });
+        vertexCount += 1;
+      });
+
+      return selectables;
+    }
+
+    function convexHull2D(points) {
+      const unique = [];
+      const seen = new Set();
+      for (const point of points) {
+        const key = `${point[0].toFixed(8)}|${point[1].toFixed(8)}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          unique.push(point);
+        }
+      }
+      if (unique.length <= 1) {
+        return unique;
+      }
+
+      unique.sort((a, b) => (a[0] - b[0]) || (a[1] - b[1]));
+
+      function cross2(o, a, b) {
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+      }
+
+      const lower = [];
+      for (const point of unique) {
+        while (lower.length >= 2 && cross2(lower[lower.length - 2], lower[lower.length - 1], point) <= 0) {
+          lower.pop();
+        }
+        lower.push(point);
+      }
+
+      const upper = [];
+      for (let index = unique.length - 1; index >= 0; index -= 1) {
+        const point = unique[index];
+        while (upper.length >= 2 && cross2(upper[upper.length - 2], upper[upper.length - 1], point) <= 0) {
+          upper.pop();
+        }
+        upper.push(point);
+      }
+
+      upper.pop();
+      lower.pop();
+      return lower.concat(upper);
+    }
+
+    function projectPoint(point, mode) {
+      if (mode === "fxy") {
+        return [point[0], point[1]];
+      }
+      if (mode === "fxt") {
+        return [point[0], point[2]];
+      }
+      return [point[1], point[2]];
+    }
+
+    function setText(id, text) {
+      document.getElementById(id).textContent = text;
+    }
+
+    function typesetMath(root) {
+      if (!root || typeof window.renderMathInElement !== "function") {
+        return;
+      }
+
+      window.renderMathInElement(root, {
+        delimiters: [
+          { left: "\\(", right: "\\)", display: false },
+          { left: "\\[", right: "\\]", display: true }
+        ],
+        throwOnError: false
+      });
+    }
+
+    function svgEl(tag, attrs = {}, text = null) {
+      const element = document.createElementNS("http://www.w3.org/2000/svg", tag);
+      for (const [key, value] of Object.entries(attrs)) {
+        element.setAttribute(key, value);
+      }
+      if (text !== null) {
+        element.textContent = text;
+      }
+      return element;
+    }
+
+    function clearSvg(id) {
+      const svg = document.getElementById(id);
+      while (svg.firstChild) {
+        svg.removeChild(svg.firstChild);
+      }
+      return svg;
+    }
+
+    function drawArrow(svg, x1, y1, x2, y2, color, width = 2.2, dashed = false) {
+      svg.appendChild(svgEl("line", {
+        x1,
+        y1,
+        x2,
+        y2,
+        stroke: color,
+        "stroke-width": width,
+        "stroke-linecap": "round",
+        "stroke-dasharray": dashed ? "6 5" : "none"
+      }));
+
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const length = Math.hypot(dx, dy) || 1;
+      const ux = dx / length;
+      const uy = dy / length;
+      const p1 = [x2, y2];
+      const p2 = [x2 - 9 * ux + 5 * uy, y2 - 9 * uy - 5 * ux];
+      const p3 = [x2 - 9 * ux - 5 * uy, y2 - 9 * uy + 5 * ux];
+      svg.appendChild(svgEl("polygon", {
+        points: `${p1[0]},${p1[1]} ${p2[0]},${p2[1]} ${p3[0]},${p3[1]}`,
+        fill: color
+      }));
+    }
+
+    function drawScene(contact1, contact2) {
+      const svg = clearSvg("scene");
+      const center = [210, 210];
+
+      svg.appendChild(svgEl("rect", { x: 0, y: 0, width: 420, height: 420, fill: "#fffdf9" }));
+      for (let i = 0; i <= 8; i += 1) {
+        const t = 30 + i * 45;
+        svg.appendChild(svgEl("line", { x1: 30, y1: t, x2: 390, y2: t, stroke: "#ece4d6", "stroke-width": 1 }));
+        svg.appendChild(svgEl("line", { x1: t, y1: 30, x2: t, y2: 390, stroke: "#ece4d6", "stroke-width": 1 }));
+      }
+
+      svg.appendChild(svgEl("circle", {
+        cx: center[0],
+        cy: center[1],
+        r: 120 * state.radius,
+        fill: "#faf4e8",
+        stroke: "#7b7265",
+        "stroke-width": 2
+      }));
+      svg.appendChild(svgEl("circle", { cx: center[0], cy: center[1], r: 3.5, fill: "#1d1a17" }));
+
+      const contacts = [
+        { data: contact1, color: "#0e7257", label: "c1" },
+        { data: contact2, color: "#b85a2b", label: "c2" }
+      ];
+
+      for (const contact of contacts) {
+        const p = [
+          center[0] + contact.data.r[0] * 120,
+          center[1] - contact.data.r[1] * 120
+        ];
+
+        svg.appendChild(svgEl("circle", { cx: p[0], cy: p[1], r: 6, fill: contact.color }));
+        svg.appendChild(svgEl("text", {
+          x: p[0] + 8,
+          y: p[1] - 8,
+          fill: contact.color,
+          "font-size": 16,
+          "font-weight": 600
+        }, contact.label));
+
+        drawArrow(svg, p[0], p[1], p[0] + contact.data.inward[0] * 44, p[1] - contact.data.inward[1] * 44, "#1d1a17", 2.2, true);
+        for (const force of contact.data.forces) {
+          drawArrow(svg, p[0], p[1], p[0] + force[0] * 34, p[1] - force[1] * 34, contact.color, 2.8, false);
+        }
+      }
+    }
+
+    function createWrenchSpaceView(container) {
+      const scene = new THREE.Scene();
+      const root = new THREE.Group();
+      scene.add(root);
+
+      const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setClearColor(0xffffff, 1);
+      renderer.domElement.style.width = "100%";
+      renderer.domElement.style.height = "100%";
+
+      const labelRenderer = new CSS2DRenderer();
+      labelRenderer.domElement.className = "css2d-root";
+
+      container.replaceChildren(renderer.domElement, labelRenderer.domElement);
+
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enablePan = false;
+      controls.enableDamping = false;
+      controls.rotateSpeed = 0.82;
+      controls.zoomSpeed = 0.9;
+
+      const ambient = new THREE.AmbientLight(0xffffff, 1.2);
+      const keyLight = new THREE.DirectionalLight(0xffffff, 1.05);
+      keyLight.position.set(5, 6, 7);
+      const fillLight = new THREE.DirectionalLight(0xf3ead8, 0.72);
+      fillLight.position.set(-6, -2, 4);
+      scene.add(ambient, keyLight, fillLight);
+
+      const raycaster = new THREE.Raycaster();
+      const pointer = new THREE.Vector2();
+      const baseCameraDirection = new THREE.Vector3(-1, 0.72, 1.1).normalize();
+      const originVec = new THREE.Vector3(0, 0, 0);
+      let defaultDistance = 6.9;
+      let currentRadius = 2.5;
+      let pickables = [];
+      let resizeObserver = null;
+      let pointerDown = null;
+      let hasDrawn = false;
+      let onViewChange = null;
+
+      function toVec3(point) {
+        return new THREE.Vector3(point[0], point[1], point[2]);
+      }
+
+      function disposeTree(object) {
+        object.traverse(node => {
+          if (node.geometry) {
+            node.geometry.dispose();
+          }
+          if (Array.isArray(node.material)) {
+            node.material.forEach(material => material.dispose());
+          } else if (node.material) {
+            node.material.dispose();
+          }
+        });
+      }
+
+      function clearRoot() {
+        while (root.children.length > 0) {
+          const child = root.children[0];
+          root.remove(child);
+          disposeTree(child);
+        }
+        labelRenderer.domElement.replaceChildren();
+        pickables = [];
+      }
+
+      function polygonGeometry(points) {
+        const geometry = new THREE.BufferGeometry();
+        const vertices = [];
+        if (points.length >= 3) {
+          for (let index = 1; index < points.length - 1; index += 1) {
+            const a = points[0];
+            const b = points[index];
+            const c = points[index + 1];
+            vertices.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
+          }
+        }
+        geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+        geometry.computeVertexNormals();
+        return geometry;
+      }
+
+      function segmentGeometry(pointPairs) {
+        const geometry = new THREE.BufferGeometry();
+        const vertices = [];
+        pointPairs.forEach(([start, end]) => {
+          vertices.push(start[0], start[1], start[2], end[0], end[1], end[2]);
+        });
+        geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+        return geometry;
+      }
+
+      function makeLabel(text, className) {
+        const element = document.createElement("div");
+        element.className = className;
+        element.textContent = text;
+        return new CSS2DObject(element);
+      }
+
+      function addPointCard(pointInfo) {
+        const anchor = document.createElement("div");
+        anchor.className = "point-card-anchor";
+
+        const card = document.createElement("div");
+        card.className = "point-card";
+        card.innerHTML = `
+          <div class="point-card-title">${pointInfo.labelPlain}</div>
+          <div class="point-card-values">[${fmt(pointInfo.point[0], 2)}, ${fmt(pointInfo.point[1], 2)}, ${fmt(pointInfo.point[2], 2)}]</div>
+        `;
+        card.querySelector(".point-card-title").style.color = pointInfo.color;
+        anchor.appendChild(card);
+
+        return new CSS2DObject(anchor);
+      }
+
+      function addAxes(axisLength) {
+        const axesGroup = new THREE.Group();
+        const axisLineColor = new THREE.Color("#d9cebc");
+        const axisArrowColor = new THREE.Color("#8c8578");
+        const axes = [
+          { label: "Fx", end: [axisLength, 0, 0], start: [-axisLength, 0, 0] },
+          { label: "Fy", end: [0, axisLength, 0], start: [0, -axisLength, 0] },
+          { label: "s tau", end: [0, 0, axisLength], start: [0, 0, -axisLength] }
+        ];
+
+        axes.forEach(axis => {
+          const line = new THREE.Line(
+            segmentGeometry([[axis.start, axis.end]]),
+            new THREE.LineBasicMaterial({ color: axisLineColor })
+          );
+          axesGroup.add(line);
+
+          const arrow = new THREE.ArrowHelper(
+            toVec3(axis.end).normalize(),
+            originVec,
+            axisLength,
+            axisArrowColor,
+            Math.max(0.18, axisLength * 0.08),
+            Math.max(0.09, axisLength * 0.04)
+          );
+          axesGroup.add(arrow);
+
+          const label = makeLabel(axis.label, "scene-tag axis");
+          label.position.copy(toVec3(axis.end).multiplyScalar(1.05));
+          axesGroup.add(label);
+        });
+
+        root.add(axesGroup);
+      }
+
+      function addLocalSet(points, fillColor, strokeColor, label, labelClass) {
+        const group = new THREE.Group();
+        const mesh = new THREE.Mesh(
+          polygonGeometry(points),
+          new THREE.MeshPhongMaterial({
+            color: fillColor,
+            transparent: true,
+            opacity: 0.22,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            flatShading: true
+          })
+        );
+        group.add(mesh);
+
+        const linePoints = [...points, points[0]].map(toVec3);
+        const outline = new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints(linePoints),
+          new THREE.LineBasicMaterial({ color: strokeColor, transparent: true, opacity: 0.9 })
+        );
+        group.add(outline);
+
+        const centroid = points.reduce((sum, point) => vecAdd(sum, point), [0, 0, 0]).map(value => value / points.length);
+        const tag = makeLabel(label, labelClass);
+        tag.position.copy(toVec3(centroid));
+        group.add(tag);
+        root.add(group);
+      }
+
+      function addGlobalHull(vertices3D, hullFaces, limitingFacet) {
+        const palette = {
+          fill: "#6f8dc5",
+          stroke: "#4c678f",
+          limiting: "#c7921c"
+        };
+
+        hullFaces.forEach(face => {
+          const facePoints = face.indices.map(index => vertices3D[index]);
+          const isLimiting = limitingFacet
+            && Math.abs(face.distance - limitingFacet.distance) <= 1e-5
+            && dot(face.normal, limitingFacet.normal) >= 0.9995;
+
+          const faceMesh = new THREE.Mesh(
+            polygonGeometry(facePoints),
+            new THREE.MeshPhongMaterial({
+              color: isLimiting ? palette.limiting : palette.fill,
+              transparent: true,
+              opacity: isLimiting ? 0.2 : 0.16,
+              side: THREE.DoubleSide,
+              depthWrite: false,
+              flatShading: true,
+              polygonOffset: true,
+              polygonOffsetFactor: isLimiting ? -1 : 0,
+              polygonOffsetUnits: isLimiting ? -1 : 0
+            })
+          );
+          root.add(faceMesh);
+        });
+
+        const edgeKeys = new Set();
+        const edgePairs = [];
+        hullFaces.forEach(face => {
+          for (let index = 0; index < face.indices.length; index += 1) {
+            const a = face.indices[index];
+            const b = face.indices[(index + 1) % face.indices.length];
+            const key = a < b ? `${a}|${b}` : `${b}|${a}`;
+            if (!edgeKeys.has(key)) {
+              edgeKeys.add(key);
+              edgePairs.push([vertices3D[a], vertices3D[b]]);
+            }
+          }
+        });
+
+        const edges = new THREE.LineSegments(
+          segmentGeometry(edgePairs),
+          new THREE.LineBasicMaterial({ color: palette.stroke, transparent: true, opacity: 0.62 })
+        );
+        root.add(edges);
+      }
+
+      function addPrimitiveRays(contact1, contact2) {
+        const rays = [
+          { point: contact1.primitiveWrenches[0], color: "#0e7257" },
+          { point: contact1.primitiveWrenches[1], color: "#0e7257" },
+          { point: contact2.primitiveWrenches[0], color: "#b85a2b" },
+          { point: contact2.primitiveWrenches[1], color: "#b85a2b" }
+        ];
+
+        rays.forEach(ray => {
+          const line = new THREE.Line(
+            segmentGeometry([[[0, 0, 0], ray.point]]),
+            new THREE.LineBasicMaterial({ color: ray.color, transparent: true, opacity: 0.82 })
+          );
+          root.add(line);
+        });
+      }
+
+      function addSelectablePoints(selectables) {
+        selectables.forEach(info => {
+          const radius = info.kind === "vertex" ? 0.06 : info.kind === "origin" ? 0.08 : 0.085;
+          const holder = new THREE.Group();
+          holder.position.copy(toVec3(info.point));
+
+          const visible = new THREE.Mesh(
+            new THREE.SphereGeometry(radius, 18, 18),
+            new THREE.MeshBasicMaterial({
+              color: info.color,
+              transparent: true,
+              opacity: info.kind === "vertex" ? 0.75 : 1
+            })
+          );
+          holder.add(visible);
+
+          if (info.key === selectedPointKey) {
+            const halo = new THREE.Mesh(
+              new THREE.SphereGeometry(radius * 1.7, 18, 18),
+              new THREE.MeshBasicMaterial({
+                color: info.color,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.72
+              })
+            );
+            holder.add(halo);
+
+            const card = addPointCard(info);
+            holder.add(card);
+          }
+
+          const hit = new THREE.Mesh(
+            new THREE.SphereGeometry(Math.max(radius * 2.35, 0.16), 14, 14),
+            new THREE.MeshBasicMaterial({
+              transparent: true,
+              opacity: 0,
+              depthWrite: false
+            })
+          );
+          hit.userData.selectable = info;
+          holder.add(hit);
+          pickables.push(hit);
+
+          root.add(holder);
+        });
+      }
+
+      function addCriticalDirection(criticalTouch) {
+        if (!criticalTouch) {
+          return;
+        }
+
+        if (criticalTouch.epsilon > 1e-6) {
+          const direction = toVec3(criticalTouch.point).normalize();
+          const arrow = new THREE.ArrowHelper(
+            direction,
+            originVec,
+            criticalTouch.epsilon,
+            0xc7921c,
+            Math.max(0.16, criticalTouch.epsilon * 0.2),
+            Math.max(0.08, criticalTouch.epsilon * 0.1)
+          );
+          root.add(arrow);
+        } else {
+          const collapse = new THREE.Mesh(
+            new THREE.SphereGeometry(0.14, 20, 20),
+            new THREE.MeshBasicMaterial({
+              color: 0xc7921c,
+              wireframe: true,
+              transparent: true,
+              opacity: 0.75
+            })
+          );
+          root.add(collapse);
+        }
+      }
+
+      function updateCameraRange(axisLength) {
+        currentRadius = axisLength;
+        controls.minDistance = Math.max(1.6, axisLength * 0.9);
+        controls.maxDistance = axisLength * 7.5;
+      }
+
+      function applyDefaultView() {
+        const defaultPosition = baseCameraDirection.clone().multiplyScalar(currentRadius * 2.85);
+        defaultDistance = defaultPosition.length();
+        camera.position.copy(defaultPosition);
+        controls.target.set(0, 0, 0);
+        controls.update();
+      }
+
+      function getZoomPercent() {
+        const currentDistance = camera.position.distanceTo(controls.target);
+        return Math.round((defaultDistance / currentDistance) * 100);
+      }
+
+      function renderScene() {
+        renderer.render(scene, camera);
+        labelRenderer.render(scene, camera);
+        if (typeof onViewChange === "function") {
+          onViewChange(getZoomPercent());
+        }
+      }
+
+      function draw(contact1, contact2, vertices3D, epsilon, limitingFacet, selectables = []) {
+        clearRoot();
+
+        const local1 = [[0, 0, 0], ...contact1.primitiveWrenches];
+        const local2 = [[0, 0, 0], ...contact2.primitiveWrenches];
+        const scenePoints = [[0, 0, 0], ...contact1.primitiveWrenches, ...contact2.primitiveWrenches, ...vertices3D];
+        const criticalTouch = buildCriticalTouchPoint(epsilon, limitingFacet);
+        const hullFaces = computeHullFaces(vertices3D);
+
+        let maxAbs = 1;
+        scenePoints.forEach(point => {
+          maxAbs = Math.max(maxAbs, Math.abs(point[0]), Math.abs(point[1]), Math.abs(point[2]));
+        });
+        maxAbs = Math.max(maxAbs, epsilon * 1.5, 0.8) * 1.18;
+        const axisLength = maxAbs * 1.18;
+
+        addAxes(axisLength);
+        addGlobalHull(vertices3D, hullFaces, limitingFacet);
+        addLocalSet(local1, "#0e7257", "#0e7257", "W1", "scene-tag set green");
+        addLocalSet(local2, "#b85a2b", "#b85a2b", "W2", "scene-tag set rust");
+        addPrimitiveRays(contact1, contact2);
+        addCriticalDirection(criticalTouch);
+        addSelectablePoints(selectables);
+
+        updateCameraRange(axisLength);
+        if (!hasDrawn) {
+          applyDefaultView();
+          hasDrawn = true;
+        }
+
+        renderScene();
+      }
+
+      function scaleDistance(multiplier) {
+        const offset = camera.position.clone().sub(controls.target);
+        const currentDistance = offset.length();
+        const nextDistance = clamp(currentDistance * multiplier, controls.minDistance, controls.maxDistance);
+        offset.setLength(nextDistance);
+        camera.position.copy(controls.target.clone().add(offset));
+        controls.update();
+        renderScene();
+      }
+
+      renderer.domElement.addEventListener("pointerdown", event => {
+        if (event.button !== 0) {
+          return;
+        }
+        pointerDown = { x: event.clientX, y: event.clientY };
+      });
+
+      renderer.domElement.addEventListener("pointerup", event => {
+        if (!pointerDown || event.button !== 0) {
+          pointerDown = null;
+          return;
+        }
+
+        const movement = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y);
+        pointerDown = null;
+        if (movement > 5) {
+          return;
+        }
+
+        const rect = renderer.domElement.getBoundingClientRect();
+        pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(pointer, camera);
+        const hits = raycaster.intersectObjects(pickables, false);
+        const hit = hits.find(entry => entry.object.userData && entry.object.userData.selectable);
+        if (hit) {
+          setSelectedPoint(hit.object.userData.selectable.key);
+        }
+      });
+
+      renderer.domElement.addEventListener("pointerleave", () => {
+        pointerDown = null;
+      });
+
+      controls.addEventListener("start", () => {
+        container.classList.add("dragging");
+      });
+      controls.addEventListener("end", () => {
+        container.classList.remove("dragging");
+      });
+      controls.addEventListener("change", renderScene);
+
+      container.addEventListener("keydown", event => {
+        if (event.key === "+" || event.key === "=") {
+          event.preventDefault();
+          scaleDistance(1 / 1.18);
+          return;
+        }
+        if (event.key === "-" || event.key === "_") {
+          event.preventDefault();
+          scaleDistance(1.18);
+        }
+      });
+
+      function resize() {
+        const rect = container.getBoundingClientRect();
+        const width = Math.max(1, Math.round(rect.width));
+        const height = Math.max(1, Math.round(rect.height));
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+        renderer.setSize(width, height, false);
+        labelRenderer.setSize(width, height);
+        renderScene();
+      }
+
+      if (typeof ResizeObserver === "function") {
+        resizeObserver = new ResizeObserver(resize);
+        resizeObserver.observe(container);
+      } else {
+        window.addEventListener("resize", resize);
+      }
+      resize();
+
+      return {
+        draw,
+        resetView() {
+          applyDefaultView();
+          renderScene();
+        },
+        nudgeZoom(direction) {
+          scaleDistance(direction > 0 ? 1 / 1.18 : 1.18);
+        },
+        getZoomPercent,
+        setViewChangeHandler(handler) {
+          onViewChange = handler;
+        }
+      };
+    }
+
+    function populateWrenchTable(primitiveWrenches) {
+      const labels = ["w_{1,+}", "w_{1,-}", "w_{2,+}", "w_{2,-}"];
+      const tbody = document.getElementById("wrench-table-body");
+      tbody.innerHTML = "";
+      primitiveWrenches.forEach((wrench, index) => {
+        const row = document.createElement("tr");
+        const labelCell = document.createElement("td");
+        const vectorCell = document.createElement("td");
+        labelCell.innerHTML = `\\(${labels[index]}\\)`;
+        vectorCell.innerHTML = `\\([${fmt(wrench[0])}, ${fmt(wrench[1])}, ${fmt(wrench[2])}]\\)`;
+        row.appendChild(labelCell);
+        row.appendChild(vectorCell);
+        tbody.appendChild(row);
+      });
+    }
+
+    function populateNotation(contact1, contact2, epsilon) {
+      const rows = [
+        ["\\mu", "Friction coefficient", fmt(state.mu)],
+        ["\\lambda", "Torque weight in the paper", fmt(state.torqueScale * state.torqueScale)],
+        ["r_1", "Contact 1 location", `[${fmt(contact1.r[0])}, ${fmt(contact1.r[1])}]`],
+        ["r_2", "Contact 2 location", `[${fmt(contact2.r[0])}, ${fmt(contact2.r[1])}]`],
+        ["B_G", "Unit-budget feasible wrench set", state.metric === "linf" ? "Minkowski-sum geometry" : "Convex-hull geometry"],
+        ["Q", "Ferrari-Canny quality", fmt(epsilon, 4)]
+      ];
+
+      const tbody = document.getElementById("notation-body");
+      tbody.innerHTML = "";
+      rows.forEach(([symbol, meaning, value]) => {
+        const row = document.createElement("tr");
+        const symbolCell = document.createElement("td");
+        symbolCell.innerHTML = `\\(${symbol}\\)`;
+        row.appendChild(symbolCell);
+
+        const meaningCell = document.createElement("td");
+        meaningCell.textContent = meaning;
+        row.appendChild(meaningCell);
+
+        const valueCell = document.createElement("td");
+        valueCell.textContent = value;
+        row.appendChild(valueCell);
+        tbody.appendChild(row);
+      });
+    }
+
+    function setPresetActive(activeId) {
+      presetIds.forEach(id => {
+        document.getElementById(id).classList.toggle("active", id === activeId);
+      });
+    }
+
+    function setMetric(metric) {
+      state.metric = metric;
+      document.getElementById("metric-linf").classList.toggle("active", metric === "linf");
+      document.getElementById("metric-l1").classList.toggle("active", metric === "l1");
+      render();
+    }
+
+    function redrawWrenchSpace() {
+      if (!lastSpatialData || !wrenchView) {
+        return;
+      }
+      wrenchView.draw(
+        lastSpatialData.contact1,
+        lastSpatialData.contact2,
+        lastSpatialData.vertices3D,
+        lastSpatialData.epsilon,
+        lastSpatialData.limitingFacet,
+        lastSpatialData.selectables
+      );
+      renderCriticalPointPanel();
+      typesetMath(document.getElementById("critical-point-card"));
+      renderZoomValue();
+    }
+
+    function resetWrenchSpaceView() {
+      if (!wrenchView) {
+        return;
+      }
+      wrenchView.resetView();
+    }
+
+    function renderZoomValue() {
+      if (!wrenchView) {
+        setText("zoom-value", "Zoom 100%");
+        return;
+      }
+      setText("zoom-value", `Zoom ${wrenchView.getZoomPercent()}%`);
+    }
+
+    function nudgeZoom(direction) {
+      if (!wrenchView) {
+        return;
+      }
+      wrenchView.nudgeZoom(direction);
+    }
+
+    function renderCriticalPointPanel() {
+      const card = document.getElementById("critical-point-card");
+      if (!lastSpatialData || !lastSpatialData.criticalTouch || !lastSpatialData.limitingFacet) {
+        card.innerHTML = `
+          <strong>Nearest Boundary Point</strong>
+          <div>No nearest boundary point is available for this geometry.</div>
+        `;
+        return;
+      }
+
+      const critical = lastSpatialData.criticalTouch;
+      const collapsed = critical.epsilon <= 1e-6;
+      card.innerHTML = `
+        <strong>Nearest Boundary Point</strong>
+        <div>One nearest point on \\(\\operatorname{Bd}(B_G)\\) from the origin.</div>
+        <div class="selection-grid">
+          <div class="selection-row"><span>\\(F_x\\)</span><span class="selection-value">${fmt(critical.point[0], 2)}</span></div>
+          <div class="selection-row"><span>\\(F_y\\)</span><span class="selection-value">${fmt(critical.point[1], 2)}</span></div>
+          <div class="selection-row"><span>\\(s\\tau\\)</span><span class="selection-value">${fmt(critical.point[2], 2)}</span></div>
+        </div>
+        <div>${collapsed
+          ? "The nearest boundary point has collapsed to the origin, so \\(Q = 0\\)."
+          : "This gold point is a nearest boundary point of \\(B_G\\) from the origin. Its distance from the origin is the Ferrari-Canny quality \\(Q\\)."
+        }</div>
+      `;
+    }
+
+    function setSelectedPoint(key) {
+      selectedPointKey = key;
+      redrawWrenchSpace();
+    }
+
+    function applyPreset(name, buttonId) {
+      Object.assign(state, presets[name]);
+      inputIds.forEach(id => {
+        document.getElementById(id).value = state[id];
+      });
+      setPresetActive(buttonId);
+      setMetric(state.metric);
+      render();
+    }
+
+    function updateControls() {
+      setText("radius-value", fmt(state.radius));
+      setText("mu-value", fmt(state.mu));
+      setText("theta1-value", `${Math.round(state.theta1)} deg`);
+      setText("theta2-value", `${Math.round(state.theta2)} deg`);
+      setText("torqueScale-value", fmt(state.torqueScale));
+    }
+
+    function renderNarrative(contact1, contact2, primitiveWrenches, epsilon, limitingFacet, vertices3D) {
+      const forceClosure = epsilon > 1e-6;
+      const statusBox = document.getElementById("status-box");
+      statusBox.className = `status-box ${forceClosure ? "good" : "bad"}`;
+      statusBox.innerHTML = forceClosure
+        ? `<strong>Positive quality margin.</strong>The origin sits inside the feasible wrench set, so the grasp can resist a full disturbance ball of radius \\(Q = ${fmt(epsilon, 4)}\\).`
+        : `<strong>Margin collapsed to zero.</strong>A supporting face reaches the origin, so \\(Q = ${fmt(epsilon, 4)}\\) and the grasp loses full worst-case robustness.`;
+
+      document.getElementById("live-summary").innerHTML = state.metric === "linf"
+        ? `You are using \\(L_\\infty\\), so the global set is built from sums of points in \\(W_1\\) and \\(W_2\\).`
+        : `You are using \\(L_1\\), so all primitive contact rays share one total budget and the global set becomes a convex hull.`;
+
+      document.getElementById("equation-box").innerHTML = `
+        <div class="formula-line">\\[ f = n \\pm \\mu t \\]</div>
+        <div class="formula-line">\\[ w = [F_x, F_y, s\\tau] \\]</div>
+        <div class="formula-line">\\[ Q = \\operatorname{distance}(0, \\operatorname{Bd}(B_G)) = ${fmt(epsilon, 4)} \\]</div>
+      `;
+
+      document.getElementById("wrench-space-note").innerHTML = forceClosure
+        ? `<strong>Read it in 3D.</strong> The black point is the zero-disturbance origin. The pale blue polytope \\(B_G\\) still wraps around it, so the grasp keeps a positive worst-case margin. The gold point is a nearest boundary point of \\(B_G\\) from the origin, and the gold outline marks the nearest face used to read off \\(Q\\).`
+        : `<strong>Read it in 3D.</strong> The black origin point now lies on the boundary of \\(B_G\\). The gold outline marks a supporting face through the origin, so the nearest boundary point has collapsed to the origin and \\(Q = 0\\).`;
+
+      document.getElementById("metric-note").innerHTML = state.metric === "linf"
+        ? `<div class="formula-line">\\[ B_G = W_1 \\oplus W_2 \\]</div><div class="formula-line">Each contact keeps its own local budget, so the 3D feasible set is built by adding one point from \\(W_1\\) to one point from \\(W_2\\).</div>`
+        : `<div class="formula-line">\\[ B_G = \\operatorname{conv}\\{0, w_{1,+}, w_{1,-}, w_{2,+}, w_{2,-}\\} \\]</div><div class="formula-line">All primitive contact rays share one total budget, so the 3D feasible set is the convex hull of the primitive wrench points.</div>`;
+    }
+
+    function render() {
+      updateControls();
+
+      const contact1 = contactFromAngle(state.theta1, state.radius, state.mu, state.torqueScale);
+      const contact2 = contactFromAngle(state.theta2, state.radius, state.mu, state.torqueScale);
+      const primitiveWrenches = [...contact1.primitiveWrenches, ...contact2.primitiveWrenches];
+      const vertices3D = buildFeasibleVertices(contact1, contact2, state.metric);
+      const { epsilon, limitingFacet } = computeEpsilon(vertices3D);
+      const criticalTouch = buildCriticalTouchPoint(epsilon, limitingFacet);
+      const selectables = buildSelectablePoints(contact1, contact2, vertices3D, criticalTouch);
+
+      if (selectedPointKey && !selectables.some(info => info.key === selectedPointKey)) {
+        selectedPointKey = null;
+      }
+      if (!selectedPointKey && criticalTouch && selectables.some(info => info.key === criticalTouch.key)) {
+        selectedPointKey = criticalTouch.key;
+      }
+
+      drawScene(contact1, contact2);
+      lastSpatialData = { contact1, contact2, vertices3D, epsilon, limitingFacet, criticalTouch, selectables };
+      if (wrenchView) {
+        wrenchView.draw(contact1, contact2, vertices3D, epsilon, limitingFacet, selectables);
+      }
+
+      populateWrenchTable(primitiveWrenches);
+      populateNotation(contact1, contact2, epsilon);
+      renderNarrative(contact1, contact2, primitiveWrenches, epsilon, limitingFacet, vertices3D);
+      typesetMath(document.getElementById("wrench-table-body"));
+      typesetMath(document.getElementById("status-box"));
+      typesetMath(document.getElementById("live-summary"));
+      typesetMath(document.getElementById("notation-body"));
+      typesetMath(document.getElementById("equation-box"));
+      typesetMath(document.getElementById("wrench-space-note"));
+      typesetMath(document.getElementById("metric-note"));
+      renderCriticalPointPanel();
+      typesetMath(document.getElementById("critical-point-card"));
+      renderZoomValue();
+    }
+
+    inputIds.forEach(id => {
+      document.getElementById(id).addEventListener("input", event => {
+        state[id] = parseFloat(event.target.value);
+        setPresetActive(null);
+        render();
+      });
+    });
+
+    document.getElementById("metric-linf").addEventListener("click", () => {
+      setPresetActive(null);
+      setMetric("linf");
+    });
+    document.getElementById("metric-l1").addEventListener("click", () => {
+      setPresetActive(null);
+      setMetric("l1");
+    });
+
+    document.getElementById("preset-symmetric").addEventListener("click", () => applyPreset("symmetric", "preset-symmetric"));
+    document.getElementById("preset-lowmu").addEventListener("click", () => applyPreset("lowmu", "preset-lowmu"));
+    document.getElementById("preset-skewed").addEventListener("click", () => applyPreset("skewed", "preset-skewed"));
+    document.getElementById("preset-fail").addEventListener("click", () => applyPreset("fail", "preset-fail"));
+
+    document.getElementById("reset-view").addEventListener("click", () => {
+      resetWrenchSpaceView();
+    });
+    document.getElementById("zoom-in").addEventListener("click", () => {
+      nudgeZoom(1);
+    });
+    document.getElementById("zoom-out").addEventListener("click", () => {
+      nudgeZoom(-1);
+    });
+
+    wrenchView = createWrenchSpaceView(document.getElementById("wrench-space-3d"));
+    wrenchView.setViewChangeHandler(renderZoomValue);
+
+    typesetMath(document.body);
+    render();
+  </script>
+</body>
+</html>
