@@ -2,6 +2,8 @@
 
 A standalone HTML explainer for Ferrari and Canny's 1992 paper, *Planning Optimal Grasps*.
 
+Created with OpenAI Codex (GPT-5.4).
+
 This repo turns the paper into a readable, interactive page with:
 
 - a plain-language walkthrough of the main ideas

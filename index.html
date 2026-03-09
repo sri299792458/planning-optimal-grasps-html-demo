@@ -140,13 +140,13 @@
       align-items: center;
       gap: 8px;
       margin-bottom: 12px;
-      padding: 7px 12px;
+      padding: 7px 14px;
       border-radius: 999px;
-      background: rgba(29, 26, 23, 0.07);
-      color: var(--muted);
-      font-size: 0.88rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
+      border: 1px solid rgba(14, 114, 87, 0.14);
+      background: linear-gradient(135deg, rgba(14, 114, 87, 0.10), rgba(255, 255, 255, 0.75));
+      color: #4b5952;
+      font-size: 0.92rem;
+      letter-spacing: 0.03em;
     }
 
     .hero h1 {
@@ -644,13 +644,11 @@
 <body>
   <header class="hero">
     <div class="hero-card">
-      <div class="eyebrow">Paper replacement</div>
       <h1>Planning Optimal Grasps</h1>
       <p class="lead">
-        This page is a from-scratch rewrite of Ferrari and Canny's 1992 paper. It keeps the real ideas and
-        notation, but explains them in the order a human would want to learn them: what problem the paper
-        solves, how it models contact, what the wrench-set geometry means, why there are two criteria, and how
-        the planning algorithm actually uses the quality number.
+        An interactive guide to Ferrari and Canny's seminal 1992 paper on grasp quality. This version focuses
+        on the planar case and explains how contacts become wrenches, why \(L_\infty\) and \(L_1\) create
+        different feasible sets, and how the Ferrari-Canny quality \(Q\) is read from the geometry.
       </p>
 
       <nav class="jump-row">
@@ -661,30 +659,6 @@
         <a href="#algorithm">Algorithm</a>
         <a href="#lab">Interactive Lab</a>
       </nav>
-
-      <div class="summary-grid">
-        <article class="summary-card">
-          <h2>Core Idea</h2>
-          <p>
-            Turn a grasp into a set of feasible wrenches under a unit force budget, then score the grasp by the
-            radius of the largest origin-centered ball contained in that set.
-          </p>
-        </article>
-        <article class="summary-card">
-          <h2>Why The Math Looks Weird</h2>
-          <p>
-            The paper compresses contact mechanics, force budgeting, and convex geometry into the same notation.
-            Once those are separated, the symbols mostly become bookkeeping.
-          </p>
-        </article>
-        <article class="summary-card">
-          <h2>What To Remember</h2>
-          <p>
-            Primitive contact rays become primitive wrenches; primitive wrenches generate a feasible wrench set;
-            the nearest face of that set determines quality.
-          </p>
-        </article>
-      </div>
     </div>
   </header>
 
@@ -2415,7 +2389,7 @@
     }
 
     function setSelectedPoint(key) {
-      selectedPointKey = key;
+      selectedPointKey = selectedPointKey === key ? null : key;
       redrawWrenchSpace();
     }
 
