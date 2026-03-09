@@ -21,16 +21,9 @@ The original paper is important but notation-heavy. This demo is meant to be a p
 - `index.html`: the full interactive paper replacement
 - `vendor/katex`: local math rendering assets
 - `vendor/three`: local 3D viewer assets
-- `Launch Demo.cmd`: one-click Windows launcher
-- `serve_demo.py`: cross-platform Python launcher
+- `serve_demo.py`: lightweight local server launcher
 
 ## Run it
-
-### Easiest on Windows
-
-Double-click `Launch Demo.cmd`.
-
-### Cross-platform
 
 Run:
 
@@ -71,4 +64,3 @@ http://127.0.0.1:8765/
 - No build step is required.
 - The page is fully local once the folder is served.
 - The 3D viewer uses vendored `three.js` modules, and math rendering uses vendored KaTeX assets.
-- The HTML itself is cross-platform; only `Launch Demo.cmd` is Windows-specific.

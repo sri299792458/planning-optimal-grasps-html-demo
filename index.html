@@ -1835,7 +1835,7 @@
 
       const raycaster = new THREE.Raycaster();
       const pointer = new THREE.Vector2();
-      const baseCameraDirection = new THREE.Vector3(-1, 0.72, 1.1).normalize();
+      const baseCameraDirection = new THREE.Vector3(-1, 1, 1).normalize();
       const originVec = new THREE.Vector3(0, 0, 0);
       let defaultDistance = 6.9;
       let currentRadius = 2.5;
@@ -2138,7 +2138,7 @@
       }
 
       function applyDefaultView() {
-        const defaultPosition = baseCameraDirection.clone().multiplyScalar(currentRadius * 2.85);
+        const defaultPosition = baseCameraDirection.clone().multiplyScalar(currentRadius * 3.05);
         defaultDistance = defaultPosition.length();
         camera.position.copy(defaultPosition);
         controls.target.set(0, 0, 0);
@@ -2477,9 +2477,6 @@
 
       if (selectedPointKey && !selectables.some(info => info.key === selectedPointKey)) {
         selectedPointKey = null;
-      }
-      if (!selectedPointKey && criticalTouch && selectables.some(info => info.key === criticalTouch.key)) {
-        selectedPointKey = criticalTouch.key;
       }
 
       drawScene(contact1, contact2);
